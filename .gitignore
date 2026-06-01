@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.pyc
+
+# Local extracted robot assets. The source ZIP files are tracked upstream.
+limo_description/meshes/
+limo_description/urdf/
+
+# Logs and local outputs
+*.log
+*.jsonl
+outputs/
