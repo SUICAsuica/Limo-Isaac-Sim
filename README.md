@@ -6,6 +6,14 @@
 This fork adds an automated Isaac Sim 5.1 setup for driving AgileX Limo from
 Uni-NaVid visual-language navigation outputs.
 
+<p align="center">
+  <img src="./docs/uninavid_ros2_pipeline.svg" alt="Uni-NaVid ROS 2 pipeline" />
+</p>
+
+<p align="center">
+  <img src="./docs/isaac_startup_flow.svg" alt="Isaac Sim startup flow" />
+</p>
+
 ```mermaid
 flowchart LR
     A[User instruction] --> B[Uni-NaVid ROS 2 bridge]

@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="430" viewBox="0 0 1180 430" role="img" aria-labelledby="title desc">
+  <title id="title">Uni-NaVid ROS 2 pipeline</title>
+  <desc id="desc">Data flow from user instruction and Limo camera to Uni-NaVid, ROS 2 cmd_vel, Isaac Sim Limo motion, and back to camera images.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#243447"/>
+    </marker>
+    <style>
+      .bg { fill: #f7f9fb; }
+      .box { fill: #ffffff; stroke: #25364a; stroke-width: 2; rx: 10; }
+      .model { fill: #edf7ff; stroke: #1668a8; stroke-width: 2; rx: 10; }
+      .ros { fill: #f2fff5; stroke: #247a3d; stroke-width: 2; rx: 10; }
+      .isaac { fill: #fff7ed; stroke: #a45711; stroke-width: 2; rx: 10; }
+      .topic { fill: #f6f1ff; stroke: #6b45a8; stroke-width: 2; rx: 10; }
+      .line { stroke: #243447; stroke-width: 2.4; fill: none; marker-end: url(#arrow); }
+      .label { font: 600 18px Arial, sans-serif; fill: #182536; }
+      .small { font: 14px Arial, sans-serif; fill: #31465d; }
+      .edge { font: 13px Arial, sans-serif; fill: #243447; }
+      .title { font: 700 25px Arial, sans-serif; fill: #182536; }
+    </style>
+  </defs>
+  <rect class="bg" x="0" y="0" width="1180" height="430"/>
+  <text class="title" x="40" y="44">Uni-NaVid -> ROS 2 -> Isaac Sim Limo</text>
+
+  <rect class="box" x="40" y="88" width="190" height="86"/>
+  <text class="label" x="70" y="123">User instruction</text>
+  <text class="small" x="70" y="150">natural language goal</text>
+
+  <rect class="ros" x="300" y="74" width="230" height="116"/>
+  <text class="label" x="328" y="112">ROS 2 bridge</text>
+  <text class="small" x="328" y="139">uninavid_limo_ros2_bridge.py</text>
+  <text class="small" x="328" y="164">converts actions to Twist</text>
+
+  <rect class="model" x="610" y="74" width="230" height="116"/>
+  <text class="label" x="650" y="112">Uni-NaVid server</text>
+  <text class="small" x="650" y="139">tools/uninavid_server.py</text>
+  <text class="small" x="650" y="164">returns nav actions</text>
+
+  <rect class="topic" x="910" y="88" width="210" height="86"/>
+  <text class="label" x="965" y="123">/cmd_vel</text>
+  <text class="small" x="944" y="150">geometry_msgs/Twist</text>
+
+  <rect class="isaac" x="910" y="252" width="210" height="100"/>
+  <text class="label" x="956" y="289">Isaac Sim</text>
+  <text class="small" x="942" y="316">Limo root /limo_xacro</text>
+  <text class="small" x="942" y="339">kinematic controller</text>
+
+  <rect class="topic" x="610" y="252" width="230" height="100"/>
+  <text class="label" x="666" y="289">Front camera</text>
+  <text class="small" x="646" y="316">/camera/color/image_raw</text>
+  <text class="small" x="646" y="339">sensor_msgs/Image</text>
+
+  <path class="line" d="M 230 131 L 300 131"/>
+  <text class="edge" x="247" y="118">instruction</text>
+
+  <path class="line" d="M 530 112 L 610 112"/>
+  <text class="edge" x="548" y="98">HTTP /predict</text>
+
+  <path class="line" d="M 610 153 L 530 153"/>
+  <text class="edge" x="542" y="175">forward / left / right / stop</text>
+
+  <path class="line" d="M 530 131 L 910 131"/>
+  <text class="edge" x="700" y="120">publish Twist</text>
+
+  <path class="line" d="M 1015 174 L 1015 252"/>
+  <text class="edge" x="1028" y="218">ROS 2 subscribe</text>
+
+  <path class="line" d="M 910 302 L 840 302"/>
+  <text class="edge" x="858" y="289">robot view</text>
+
+  <path class="line" d="M 610 302 C 430 302 415 190 415 190"/>
+  <text class="edge" x="430" y="286">image input</text>
+</svg>
