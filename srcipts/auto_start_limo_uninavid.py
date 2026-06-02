@@ -89,6 +89,7 @@ async def setup():
             log("Camera ROS publish setup failed; continuing with /cmd_vel graph.")
             log(traceback.format_exc())
 
+        run_script(f"{SCRIPT_DIR}/add_uninavid_pipeline_visuals.py")
         omni.timeline.get_timeline_interface().play()
         log("Isaac setup complete. Timeline is playing.")
     except Exception:

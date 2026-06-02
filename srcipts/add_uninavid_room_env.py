@@ -17,6 +17,20 @@ REAL_ENV_CANDIDATES = [
     "/Isaac/Environments/Simple_Warehouse/warehouse.usd",
     "/Isaac/Environments/Simple_Room/simple_room.usd",
 ]
+IMPORTED_PROPS_ROOT = "/World/UniNaVidImportedProps"
+IMPORTED_PROPS = [
+    ("pallet_a", "/Isaac/Environments/Simple_Warehouse/Props/SM_PaletteA_01.usd", (-2.6, 2.3, 0.0), (0, 0, 18), (1.0, 1.0, 1.0)),
+    ("cardbox_a", "/Isaac/Environments/Simple_Warehouse/Props/SM_CardBoxA_01_414.usd", (-2.0, 2.25, 0.25), (0, 0, -12), (1.0, 1.0, 1.0)),
+    ("cardbox_d", "/Isaac/Environments/Simple_Warehouse/Props/SM_CardBoxD_04_1847.usd", (-2.9, 1.55, 0.25), (0, 0, 35), (1.0, 1.0, 1.0)),
+    ("traffic_cone", "/Isaac/Environments/Simple_Warehouse/Props/S_TrafficCone.usd", (0.7, 2.7, 0.0), (0, 0, 0), (1.0, 1.0, 1.0)),
+    ("wet_floor_sign", "/Isaac/Environments/Simple_Warehouse/Props/S_WetFloorSign.usd", (1.1, -1.2, 0.0), (0, 0, -25), (1.0, 1.0, 1.0)),
+    ("book_03", "/Isaac/Environments/Office/Props/SM_Book_03.usd", (2.05, 2.15, 0.72), (0, 0, 12), (1.0, 1.0, 1.0)),
+    ("book_open", "/Isaac/Environments/Office/Props/SM_BookOpen_01.usd", (2.35, 2.22, 0.72), (0, 0, -15), (1.0, 1.0, 1.0)),
+    ("briefcase", "/Isaac/Environments/Office/Props/SM_Briefcase.usd", (2.95, 1.0, 0.0), (0, 0, -35), (1.0, 1.0, 1.0)),
+    ("extinguisher", "/Isaac/Environments/Office/Props/SM_Extinguisher.usd", (-1.1, -2.3, 0.0), (0, 0, 0), (1.0, 1.0, 1.0)),
+    ("mustard_bottle", "/Isaac/Props/YCB/Axis_Aligned_Physics/006_mustard_bottle.usd", (1.75, 2.35, 0.72), (0, 0, 0), (1.0, 1.0, 1.0)),
+    ("cracker_box", "/Isaac/Props/YCB/Axis_Aligned_Physics/003_cracker_box.usd", (2.55, 2.0, 0.72), (0, 0, 20), (1.0, 1.0, 1.0)),
+]
 
 
 def stage():
@@ -31,10 +45,11 @@ def set_xform(path, translate=(0.0, 0.0, 0.0), rotate_xyz=(0.0, 0.0, 0.0), scale
     prim = stage().GetPrimAtPath(path)
     if not prim.IsValid():
         return
-    xform = UsdGeom.XformCommonAPI(prim)
-    xform.SetTranslate(Gf.Vec3d(*translate))
-    xform.SetRotate(Gf.Vec3f(*rotate_xyz), UsdGeom.XformCommonAPI.RotationOrderXYZ)
-    xform.SetScale(Gf.Vec3f(*scale))
+    xform = UsdGeom.Xformable(prim)
+    xform.ClearXformOpOrder()
+    xform.AddTranslateOp().Set(Gf.Vec3d(*translate))
+    xform.AddRotateXYZOp().Set(Gf.Vec3f(*rotate_xyz))
+    xform.AddScaleOp().Set(Gf.Vec3f(*scale))
 
 
 def add_realistic_isaac_environment():
@@ -63,6 +78,35 @@ def add_realistic_isaac_environment():
 
     print("No Isaac environment candidate loaded; using generated fallback room.")
     return False
+
+
+def add_imported_props():
+    if get_assets_root_path is None or stage_utils is None:
+        print("Isaac asset helpers are not available; skipping imported props.")
+        return 0
+
+    assets_root_path = get_assets_root_path()
+    if not assets_root_path:
+        print("Isaac asset root was not found; skipping imported props.")
+        return 0
+
+    st = stage()
+    if st.GetPrimAtPath(IMPORTED_PROPS_ROOT).IsValid():
+        st.RemovePrim(IMPORTED_PROPS_ROOT)
+    ensure_xform(IMPORTED_PROPS_ROOT)
+
+    loaded = 0
+    for name, rel_path, translate, rotate_xyz, scale in IMPORTED_PROPS:
+        prim_path = f"{IMPORTED_PROPS_ROOT}/{name}"
+        try:
+            stage_utils.add_reference_to_stage(usd_path=assets_root_path + rel_path, prim_path=prim_path)
+            set_xform(prim_path, translate=translate, rotate_xyz=rotate_xyz, scale=scale)
+            loaded += 1
+        except Exception as exc:
+            print(f"Could not import prop {rel_path}: {exc}")
+
+    print(f"Imported Isaac Sim furniture/props: {loaded}/{len(IMPORTED_PROPS)} under {IMPORTED_PROPS_ROOT}")
+    return loaded
 
 
 def make_material(path, color, roughness=0.65):
@@ -149,6 +193,7 @@ def add_room():
             for j, ly in enumerate((1.9, 2.5)):
                 cube(f"{ROOT}/brown_table/leg_{i}_{j}", (lx, ly, 0.29), (0.055, 0.055, 0.58), mats["dark"])
         cylinder(f"{ROOT}/red_goal_marker", (2.0, 1.75, 0.35), 0.18, 0.7, mats["target"])
+        add_imported_props()
         print("Added Uni-NaVid semantic props at /World/UniNaVidRoom")
         print("Suggested instruction: find the brown table, move toward it, go under it, and stop.")
         return
@@ -186,6 +231,7 @@ def add_room():
     cylinder(f"{ROOT}/red_goal_marker", (1.6, 2.75, 0.35), 0.18, 0.7, mats["target"])
     cylinder(f"{ROOT}/plant_pot", (-2.8, -2.4, 0.22), 0.22, 0.44, mats["table"])
     cylinder(f"{ROOT}/plant_top", (-2.8, -2.4, 0.68), 0.34, 0.42, mats["plant"], collision=False)
+    add_imported_props()
 
     # Lighting and overview camera.
     dome = UsdLux.DomeLight.Define(st, f"{ROOT}/dome_light")
