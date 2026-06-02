@@ -1,8 +1,22 @@
 from pxr import Gf, Sdf, UsdGeom, UsdLux, UsdPhysics, UsdShade
 import omni.usd
 
+try:
+    from isaacsim.core.utils import stage as stage_utils
+    from isaacsim.storage.native import get_assets_root_path
+except Exception:
+    stage_utils = None
+    get_assets_root_path = None
+
 
 ROOT = "/World/UniNaVidRoom"
+REAL_ENV_ROOT = "/World/RealisticEnvironment"
+REAL_ENV_CANDIDATES = [
+    "/Isaac/Environments/Simple_Warehouse/warehouse_with_forklifts.usd",
+    "/Isaac/Environments/Simple_Warehouse/full_warehouse.usd",
+    "/Isaac/Environments/Simple_Warehouse/warehouse.usd",
+    "/Isaac/Environments/Simple_Room/simple_room.usd",
+]
 
 
 def stage():
@@ -11,6 +25,44 @@ def stage():
 
 def ensure_xform(path):
     return UsdGeom.Xform.Define(stage(), path)
+
+
+def set_xform(path, translate=(0.0, 0.0, 0.0), rotate_xyz=(0.0, 0.0, 0.0), scale=(1.0, 1.0, 1.0)):
+    prim = stage().GetPrimAtPath(path)
+    if not prim.IsValid():
+        return
+    xform = UsdGeom.XformCommonAPI(prim)
+    xform.SetTranslate(Gf.Vec3d(*translate))
+    xform.SetRotate(Gf.Vec3f(*rotate_xyz), UsdGeom.XformCommonAPI.RotationOrderXYZ)
+    xform.SetScale(Gf.Vec3f(*scale))
+
+
+def add_realistic_isaac_environment():
+    if get_assets_root_path is None or stage_utils is None:
+        print("Isaac asset helpers are not available; using generated fallback room.")
+        return False
+
+    assets_root_path = get_assets_root_path()
+    if not assets_root_path:
+        print("Isaac asset root was not found; using generated fallback room.")
+        return False
+
+    st = stage()
+    if st.GetPrimAtPath(REAL_ENV_ROOT).IsValid():
+        st.RemovePrim(REAL_ENV_ROOT)
+
+    for rel_path in REAL_ENV_CANDIDATES:
+        usd_path = assets_root_path + rel_path
+        try:
+            stage_utils.add_reference_to_stage(usd_path=usd_path, prim_path=REAL_ENV_ROOT)
+            set_xform(REAL_ENV_ROOT, translate=(0.0, 0.0, 0.0), rotate_xyz=(0.0, 0.0, 0.0))
+            print(f"Added realistic Isaac Sim environment: {usd_path}")
+            return True
+        except Exception as exc:
+            print(f"Could not load Isaac environment {usd_path}: {exc}")
+
+    print("No Isaac environment candidate loaded; using generated fallback room.")
+    return False
 
 
 def make_material(path, color, roughness=0.65):
@@ -78,6 +130,28 @@ def add_room():
     ensure_xform(ROOT)
     UsdGeom.SetStageMetersPerUnit(st, 1.0)
     UsdGeom.SetStageUpAxis(st, UsdGeom.Tokens.z)
+
+    if add_realistic_isaac_environment():
+        # Keep a few semantic visual targets in the realistic scene so natural
+        # language commands such as "brown table" and "green chair" have clear
+        # objects even when the referenced warehouse asset lacks furniture.
+        ensure_xform(ROOT)
+        mats_root = f"{ROOT}/Materials"
+        mats = {
+            "chair": make_material(f"{mats_root}/chair_green", (0.10, 0.45, 0.25)),
+            "table": make_material(f"{mats_root}/table_wood", (0.55, 0.33, 0.16)),
+            "target": make_material(f"{mats_root}/target_red", (0.85, 0.08, 0.05)),
+            "dark": make_material(f"{mats_root}/dark_metal", (0.06, 0.06, 0.06)),
+        }
+        add_chair(f"{ROOT}/target_chair", 2.0, 1.2, -20, mats)
+        cube(f"{ROOT}/brown_table/top", (2.2, 2.2, 0.58), (0.9, 0.55, 0.08), mats["table"])
+        for i, lx in enumerate((1.8, 2.6)):
+            for j, ly in enumerate((1.9, 2.5)):
+                cube(f"{ROOT}/brown_table/leg_{i}_{j}", (lx, ly, 0.29), (0.055, 0.055, 0.58), mats["dark"])
+        cylinder(f"{ROOT}/red_goal_marker", (2.0, 1.75, 0.35), 0.18, 0.7, mats["target"])
+        print("Added Uni-NaVid semantic props at /World/UniNaVidRoom")
+        print("Suggested instruction: find the brown table, move toward it, go under it, and stop.")
+        return
 
     mats_root = f"{ROOT}/Materials"
     mats = {

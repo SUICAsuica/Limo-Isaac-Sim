@@ -1,6 +1,83 @@
 
 # Limo Isaac-SIM Simulation Operation Process
 
+## Uni-NaVid + Isaac Sim + ROS 2 pipeline
+
+This fork adds an automated Isaac Sim 5.1 setup for driving AgileX Limo from
+Uni-NaVid visual-language navigation outputs.
+
+```mermaid
+flowchart LR
+    A[User instruction] --> B[Uni-NaVid ROS 2 bridge]
+    C[/camera/color/image_raw<br/>front Limo camera] --> B
+    B -->|HTTP /predict| D[Uni-NaVid server<br/>tools/uninavid_server.py]
+    D -->|actions: forward / left / right / stop| B
+    B -->|geometry_msgs/Twist| E[/cmd_vel]
+    E --> F[Isaac Sim ROS 2 node<br/>limo_goal_controller]
+    F --> G[Limo USD root<br/>/limo_xacro]
+    G --> C
+```
+
+```mermaid
+flowchart TD
+    S[Start Isaac Sim with auto_start_limo_uninavid.py]
+    S --> L[Open Limo USD again<br/>limo_base.usd]
+    L --> R[Reset Limo pose to origin]
+    R --> W[Import Isaac Sim environment<br/>Simple Warehouse preferred]
+    W --> P[Add semantic props<br/>brown table / green chair / red marker]
+    P --> K[Enable kinematic ROS 2 /cmd_vel controller]
+    K --> V[Attach front camera and publish ROS 2 image]
+    V --> Play[Start timeline / Play]
+```
+
+### What runs where
+
+| Component | File | Role |
+| --- | --- | --- |
+| Isaac Sim auto setup | `srcipts/auto_start_limo_uninavid.py` | Reopens the Limo USD, resets the robot, imports an Isaac environment, adds camera/ROS support, and starts the timeline. |
+| Environment loader | `srcipts/add_uninavid_room_env.py` | Tries Isaac Sim built-in realistic warehouse assets first, then falls back to a generated room. |
+| Limo ROS 2 controller | `srcipts/add_limo_goal_controller.py` | Subscribes `/cmd_vel` and moves the Limo root in Isaac Sim. This is kinematic for stability. |
+| Camera publisher | `srcipts/add_limo_camera_ros2.py` and `srcipts/publish_active_viewport_camera_ros2.py` | Publishes the Limo front camera as `/camera/color/image_raw`. |
+| Uni-NaVid bridge | `srcipts/uninavid_limo_ros2_bridge.py` | Sends camera images and text instruction to Uni-NaVid, then publishes `/cmd_vel`. |
+
+### Quick start for this setup
+
+Start Uni-NaVid server:
+
+```bash
+cd /home/novel/Uni-NaVid
+.venv/bin/python tools/uninavid_server.py --host 127.0.0.1 --port 8088
+```
+
+Start Isaac Sim and rebuild the Limo scene:
+
+```bash
+/home/novel/apps/isaacsim/5.1.0/isaacsim/isaac-sim.sh \
+  --exec /home/novel/Limo-Isaac-Sim/srcipts/auto_start_limo_uninavid.py
+```
+
+Drive Limo with Uni-NaVid:
+
+```bash
+cd /home/novel/Limo-Isaac-Sim
+./srcipts/run_uninavid_limo_ros2.sh \
+  "move forward to the brown table directly ahead, drive under it, and stop." \
+  /camera/color/image_raw
+```
+
+Check ROS 2 topics and bridge output:
+
+```bash
+./srcipts/run_ros2_topic_list.sh
+tail -f /tmp/uninavid_limo_bridge.log
+```
+
+Notes:
+
+- The scene is rebuilt on every Isaac Sim launch, so a broken or manually edited Limo stage is not reused.
+- The warehouse environment is loaded from Isaac Sim built-in assets when available. If those assets cannot be resolved, the script creates a lightweight fallback room.
+- Limo motion is currently kinematic root motion driven by ROS 2 `/cmd_vel`. It is stable for Uni-NaVid testing, but it is not full tire-contact physics.
+
 
 <p align="center">
   <img src="./docs/1.jpeg" />
