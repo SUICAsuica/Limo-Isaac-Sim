@@ -9,6 +9,7 @@ from pxr import Gf, Sdf, UsdGeom, UsdShade
 
 ROOT = "/World/UniNaVidPipelineGraph"
 SCREEN_GRAPH_PATH = "/World/UniNaVidPipelineScreenTextGraph"
+CONNECTION_GRAPH_PATH = "/World/UniNaVidRosConnectionActionGraph"
 
 
 def stage():
@@ -154,9 +155,73 @@ def add_screen_text_graph():
     og.Controller.evaluate_sync(graph)
 
 
+def add_connection_action_graph():
+    """Create an OmniGraph-readable connection map for Graph Editor.
+
+    The Uni-NaVid bridge and HTTP model server are external Python processes,
+    so they cannot appear as real Isaac Sim compute nodes without rewriting the
+    bridge as an OmniGraph node. This graph intentionally exposes the ROS/data
+    flow as named Action Graph nodes that can be inspected in Isaac Sim.
+    """
+    extensions.enable_extension("omni.graph.ui_nodes")
+    extensions.enable_extension("isaacsim.ros2.bridge")
+
+    st = stage()
+    if st.GetPrimAtPath(CONNECTION_GRAPH_PATH).IsValid():
+        st.RemovePrim(CONNECTION_GRAPH_PATH)
+
+    keys = og.Controller.Keys
+    graph, _, _, _ = og.Controller.edit(
+        {"graph_path": CONNECTION_GRAPH_PATH, "evaluator_name": "execution"},
+        {
+            keys.CREATE_NODES: [
+                ("A01_OnPlaybackTick", "omni.graph.action.OnPlaybackTick"),
+                ("A02_ROS2_Context", "isaacsim.ros2.bridge.ROS2Context"),
+                ("A03_CameraTopic__camera_color_image_raw", "omni.graph.nodes.ConstantString"),
+                ("A04_ExternalPythonBridge__uninavid_limo_ros2_bridge", "omni.graph.ui_nodes.PrintText"),
+                ("A05_HTTP_Predict__127_0_0_1_8088", "omni.graph.nodes.ConstantString"),
+                ("A06_UniNaVidServer__tools_uninavid_server_py", "omni.graph.ui_nodes.PrintText"),
+                ("A07_Actions__forward_left_right_stop", "omni.graph.nodes.ConstantString"),
+                ("A08_ROS2Publish__cmd_vel", "omni.graph.ui_nodes.PrintText"),
+                ("A09_ROS2SubscribeTwist__cmd_vel", "isaacsim.ros2.bridge.ROS2SubscribeTwist"),
+                ("A10_BreakLinearVelocity", "omni.graph.nodes.BreakVector3"),
+                ("A11_BreakAngularVelocity", "omni.graph.nodes.BreakVector3"),
+                ("A12_PythonKinematicController__limo_goal_controller", "omni.graph.ui_nodes.PrintText"),
+                ("A13_LimoRoot___limo_xacro", "omni.graph.nodes.ConstantString"),
+                ("A14_FrontCameraPublisher__ReplicatorROS2Writer", "omni.graph.ui_nodes.PrintText"),
+            ],
+            keys.SET_VALUES: [
+                ("A03_CameraTopic__camera_color_image_raw.inputs:value", "/camera/color/image_raw"),
+                ("A04_ExternalPythonBridge__uninavid_limo_ros2_bridge.inputs:logLevel", "Warning"),
+                ("A05_HTTP_Predict__127_0_0_1_8088.inputs:value", "POST http://127.0.0.1:8088/predict"),
+                ("A06_UniNaVidServer__tools_uninavid_server_py.inputs:logLevel", "Warning"),
+                ("A07_Actions__forward_left_right_stop.inputs:value", "actions: forward / left / right / stop"),
+                ("A08_ROS2Publish__cmd_vel.inputs:logLevel", "Warning"),
+                ("A09_ROS2SubscribeTwist__cmd_vel.inputs:topicName", "/cmd_vel"),
+                ("A12_PythonKinematicController__limo_goal_controller.inputs:logLevel", "Warning"),
+                ("A13_LimoRoot___limo_xacro.inputs:value", "/limo_xacro"),
+                ("A14_FrontCameraPublisher__ReplicatorROS2Writer.inputs:logLevel", "Warning"),
+            ],
+            keys.CONNECT: [
+                ("A01_OnPlaybackTick.outputs:tick", "A09_ROS2SubscribeTwist__cmd_vel.inputs:execIn"),
+                ("A09_ROS2SubscribeTwist__cmd_vel.outputs:linearVelocity", "A10_BreakLinearVelocity.inputs:tuple"),
+                ("A09_ROS2SubscribeTwist__cmd_vel.outputs:angularVelocity", "A11_BreakAngularVelocity.inputs:tuple"),
+                ("A09_ROS2SubscribeTwist__cmd_vel.outputs:execOut", "A12_PythonKinematicController__limo_goal_controller.inputs:execIn"),
+                ("A03_CameraTopic__camera_color_image_raw.inputs:value", "A04_ExternalPythonBridge__uninavid_limo_ros2_bridge.inputs:text"),
+                ("A05_HTTP_Predict__127_0_0_1_8088.inputs:value", "A06_UniNaVidServer__tools_uninavid_server_py.inputs:text"),
+                ("A07_Actions__forward_left_right_stop.inputs:value", "A08_ROS2Publish__cmd_vel.inputs:text"),
+                ("A13_LimoRoot___limo_xacro.inputs:value", "A14_FrontCameraPublisher__ReplicatorROS2Writer.inputs:text"),
+            ],
+        },
+    )
+    og.Controller.evaluate_sync(graph)
+    print(f"Added OmniGraph ROS connection map: {CONNECTION_GRAPH_PATH}")
+
+
 def main():
     camera_path = add_3d_graph()
     add_screen_text_graph()
+    add_connection_action_graph()
     viewport = get_active_viewport()
     if viewport is not None:
         viewport.camera_path = camera_path
